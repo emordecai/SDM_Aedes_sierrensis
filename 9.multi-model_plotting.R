@@ -138,28 +138,15 @@ gain_sum <- gain_df %>%
   summarise(Gain = mean(Gain, na.rm = TRUE),
             .groups = "drop")
 
-# p_gain <- ggplot(
-#   gain_sum,
-#   aes(x = reorder_within(Feature, Gain, model), 
-#       y = Gain)
-# ) +
-#   geom_col(fill = "#4C78A8", width = 0.7) +
-#   coord_flip() +
-#   facet_wrap(~ model, scales = "free_y", labeller = labeller(model = model_nicknames)) +
-#   scale_x_reordered() +
-#   labs(
-#     x = NULL,
-#     y = "Mean Gain"
-#   ) +
-#   theme_classic(base_size = 13) +
-#   theme(
-#   strip.text = element_text(face = "bold"),
-#   axis.text = element_text(color = "black")
-#   # theme_bw()
-#   )
-# 
-# p_gain
-# ggsave("comparison_plots/gain.png")
+
+pretty_feature <- function(x) {
+  base_var <- stringr::str_remove(x, "___.*$")
+  ifelse(
+    base_var %in% names(var_desc),
+    unname(var_desc[base_var]),
+    base_var
+  )
+}
 
 p_gain <- gain_sum %>%
   mutate(
@@ -220,30 +207,7 @@ shap_sum <- shap_df %>%
             .groups = "drop") %>%
   rename(Feature = variable)
 
-# p_shap <- ggplot(
-#   shap_sum,
-#   aes(x = reorder_within(Feature, SHAP, model),
-#       y = SHAP)
-# ) +
-#   geom_col(fill = "#4C78A8", width = 0.7) +
-#   coord_flip() +
-#   facet_wrap(~ model, scales = "free_y", labeller = labeller(model = model_nicknames)) +
-#   scale_x_reordered() +
-#   labs(
-#     x = NULL,
-#     y = "Mean |SHAP|"
-#   ) +
-#   theme_classic(base_size = 13) +
-#   theme(
-#     strip.text = element_text(face = "bold"),
-#     axis.text = element_text(color = "black")
-#   )
 
-# Optional helper: convert reordered labels back to original feature names
-pretty_feature <- function(x) {
-  base_var <- stringr::str_remove(x, "___.*$")
-  ifelse(base_var %in% names(var_desc), unname(var_desc[base_var]), base_var)
-}
 
 p_shap <- shap_sum %>%
   mutate(
@@ -284,6 +248,7 @@ p_shap <- shap_sum %>%
     legend.position = "none"
   )
 p_shap
+
 ggsave("comparison_plots/shap.png",
        p_shap,
        width = 12,
@@ -390,14 +355,6 @@ for (mname in names(outputs)) {
 # This loop combines the PDPs for the top 6 variables for each model into a single figure
 # and saves them in comparison_plots
 
-
-# ---------------------------
-# Binary features
-# ---------------------------
-binary_features <- c(
-  "forest", "shrub", "grass",
-  "wetland", "crop", "urban"
-)
 
 get_var_label <- function(v) {
   if (v %in% names(var_desc)) {
@@ -622,22 +579,6 @@ for (i in seq_len(nrow(selected_pdps))) {
     p$layers[[2]]$aes_params$colour <- panel_cols[i]
   }
   
-  # p <- p +
-  #   theme_classic(base_size = 12) +
-  #   theme(
-  #     axis.text = element_text(color = "black"),
-  #     axis.title = element_text(face = "bold"),
-  #     plot.title = element_text(face = "bold", size = 12)
-  #   ) +
-  #   labs(
-  #     title = paste0(
-  #       get_var_label(var),
-  #       " (", unname(model_nicknames[mname]), ")"
-  #     ),
-  #     x = get_var_label(var),
-  #     y = "SHAP value"
-  #   )
-  
   plot_list[[paste(mname, var, sep = "_")]] <- p
 }
 
@@ -789,6 +730,29 @@ pred_stack <- rast(pred_rasters)
 
 ensemble_mean <- app(pred_stack, mean, na.rm = TRUE)
 ensemble_sd <- app(pred_stack, sd, na.rm = TRUE)
+
+# -------------------------------
+# save raster 
+# -------------------------------
+writeRaster(
+  ensemble_mean,
+  filename = file.path(
+    "rasters",
+    paste0("ensemble_mean", ".tif")
+  ),
+  overwrite = TRUE
+)
+
+writeRaster(
+  ensemble_mean,
+  filename = file.path(
+    "rasters",
+    paste0("ensemble_sd", ".tif")
+  ),
+  overwrite = TRUE
+)
+
+
 
 # add ensemble to plotting list
 pred_with_ensemble <- c(pred_rasters, list(Ensemble = ensemble_mean))
